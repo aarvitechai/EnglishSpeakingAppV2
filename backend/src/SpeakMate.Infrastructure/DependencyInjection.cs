@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using SpeakMate.Application.Auth;
+using SpeakMate.Infrastructure.Identity;
 using SpeakMate.Application.Abstractions;
 using SpeakMate.Infrastructure.Persistence;
 using SpeakMate.Infrastructure.Persistence.Repositories;
@@ -32,11 +35,45 @@ public static class DependencyInjection
         services.AddScoped<IUsageEventRepository, UsageEventRepository>();
         services.AddScoped<IConsentRepository, ConsentRepository>();
 
-        services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(TimeProvider.System);
+
+        AddIdentity(services, configuration);
 
         services.AddHealthChecks()
             .AddDbContextCheck<SpeakMateDbContext>("database", tags: [ReadinessTag]);
 
         return services;
+    }
+
+    private static void AddIdentity(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .Validate(o => o.HasStrongSigningKey,
+                $"Jwt:SigningKey must be at least {JwtOptions.MinimumKeyBytes} bytes. Set it with user-secrets or an environment variable.")
+            .Validate(o => o.AccessTokenMinutes is > 0 and <= 60, "Jwt:AccessTokenMinutes must be between 1 and 60.")
+            .Validate(o => o.RefreshTokenDays is > 0 and <= 90, "Jwt:RefreshTokenDays must be between 1 and 90.")
+            .ValidateOnStart();
+
+        services.AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.User.RequireUniqueEmail = true;
+
+                // NIST SP 800-63B: favour length over composition rules.
+                options.Password.RequiredLength = AuthRules.PasswordMinLength;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequiredUniqueChars = 4;
+
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            })
+            .AddEntityFrameworkStores<SpeakMateDbContext>();
+
+        services.AddSingleton<TokenFactory>();
+        services.AddScoped<IAuthService, AuthService>();
     }
 }
