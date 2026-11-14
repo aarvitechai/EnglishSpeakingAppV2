@@ -17,6 +17,7 @@ try
         .Enrich.FromLogContext()
         .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture));
 
+    builder.AddHardening();
     builder.Services.AddApiServices(builder.Configuration);
 
     var app = builder.Build();

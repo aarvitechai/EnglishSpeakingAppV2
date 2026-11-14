@@ -13,6 +13,10 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <!-- Development-only settings never ship in a production package. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="SpeakMate.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>

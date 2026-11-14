@@ -1,7 +1,7 @@
-# Normalise line endings in the repository; check out with native endings.
-* text=auto
+# Normalise to LF everywhere (overrides core.autocrlf), so formatters and CI agree on every OS.
+* text=auto eol=lf
+*.cs text eol=lf diff=csharp
 *.sh text eol=lf
-*.cs text diff=csharp
 *.docx binary
 *.png binary
 *.pfx binary

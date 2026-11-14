@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/coverage/
+**/TestResults/
+.git/
+.vs/
+.vscode/
+.idea/
+*.docx
+**/.env*
+**/appsettings.*.local.json

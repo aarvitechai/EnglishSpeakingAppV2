@@ -12,7 +12,9 @@ The full product plan is in `AI_English_Practice_Web_Mobile_App_Plan.md`. It is 
 
 ## Current status
 
-In active development, built phase by phase. Each phase is committed on `dev`, then merged `dev → staging → production` with `--no-ff`.
+Phases 1–7 are complete: foundation, database, auth, AI conversation, feedback/progress/data controls, web app and hardening. Next planned: the Expo mobile app (reuse the API; keep tokens in secure storage), then pilot readiness. Each change is committed on `dev`, then promoted with `scripts/promote.sh "<label>"` (`dev → staging → production`, `--no-ff`).
+
+Read `docs/architecture.md`, `docs/security.md` and `docs/operations.md` before changing cross-cutting behaviour.
 
 ## Stack (decided, replaces the plan's Node.js/PostgreSQL suggestion)
 
@@ -24,6 +26,13 @@ In active development, built phase by phase. Each phase is committed on `dev`, t
 | AI | Gemini REST API via a typed `HttpClient`, server-side only, model ID in configuration |
 | Web | React 19 + TypeScript (strict) + Vite, TanStack Query, React Router, Zod |
 | Tests | xUnit v3 on Microsoft.Testing.Platform, NSubstitute; Vitest + Testing Library + MSW |
+
+Gotchas learned the hard way:
+- Bash heredocs in this environment break on some quote patterns. Write C#/CSS/TS files with the Write tool, not `cat <<EOF`.
+- MSW v3: the option is `onUnhandledFrame` (not `onUnhandledRequest`); in `server.use(...)` the **first** matching handler wins, so put overrides before defaults.
+- `sqlcmd` against this DB needs `-I` (QUOTED_IDENTIFIER ON) because of filtered indexes.
+- Stop the running `SpeakMate.Api` process before `dotnet build`/`dotnet test` (it locks DLLs).
+- Minimal-API `DELETE` with a body needs `[FromBody]`.
 
 Package versions: NuGet versions are pinned centrally in `backend/Directory.Packages.props`. Use 10.0.x Microsoft packages; 11.x needs .NET 11, which isn't installed.
 

@@ -1,5 +1,4 @@
 using Scalar.AspNetCore;
-using Serilog;
 using SpeakMate.Api.Endpoints;
 
 namespace SpeakMate.Api.Extensions;
@@ -8,6 +7,9 @@ internal static class WebApplicationExtensions
 {
     public static WebApplication UseApiPipeline(this WebApplication app)
     {
+        // Must run first so later middleware (rate limiting, HTTPS redirection) sees the real client IP and scheme.
+        app.UseForwardedHeadersFromTrustedProxies();
+
         // Unhandled exceptions become RFC 9457 problem responses without leaking stack traces.
         app.UseExceptionHandler();
         app.UseStatusCodePages();
@@ -19,7 +21,7 @@ internal static class WebApplicationExtensions
 
         app.UseSecurityHeaders();
         app.UseHttpsRedirection();
-        app.UseSerilogRequestLogging();
+        app.UseQuietRequestLogging();
         app.UseCors(ServiceCollectionExtensions.WebClientCorsPolicy);
 
         app.UseAuthentication();
