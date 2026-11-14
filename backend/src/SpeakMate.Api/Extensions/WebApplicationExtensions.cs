@@ -41,6 +41,7 @@ internal static class WebApplicationExtensions
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
         app.MapMeEndpoints();
+        app.MapSessionEndpoints();
         return app;
     }
 

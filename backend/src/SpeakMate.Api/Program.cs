@@ -21,6 +21,9 @@ try
 
     var app = builder.Build();
 
+    var ai = app.Services.GetRequiredService<SpeakMate.Infrastructure.AiRuntimeInfo>();
+    Log.Information("AI provider: {Provider}", ai.Provider);
+
     app.UseApiPipeline();
     app.MapApiEndpoints();
 
