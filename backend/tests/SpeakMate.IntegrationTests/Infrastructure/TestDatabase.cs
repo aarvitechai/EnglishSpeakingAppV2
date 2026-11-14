@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Respawn;
+using SpeakMate.Infrastructure.Identity;
 using SpeakMate.Infrastructure.Persistence;
 
 [assembly: AssemblyFixture(typeof(SpeakMate.IntegrationTests.Infrastructure.TestDatabase))]
@@ -42,7 +43,7 @@ public sealed class TestDatabase : IAsyncLifetime
         await connection.OpenAsync();
         _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
         {
-            SchemasToInclude = [SpeakMateDbContext.Schema],
+            SchemasToInclude = [SpeakMateDbContext.Schema, SpeakMateDbContext.AuthSchema],
             TablesToIgnore = ["__EFMigrationsHistory"],
         });
     }
@@ -52,6 +53,24 @@ public sealed class TestDatabase : IAsyncLifetime
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
         await _respawner!.ResetAsync(connection);
+    }
+
+    /// <summary>Inserts a bare login account (no profile) and returns its ID; satisfies user foreign keys.</summary>
+    public async Task<Guid> CreateUserAsync(string? email = null)
+    {
+        email ??= $"user-{Guid.NewGuid():N}@example.test";
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            NormalizedUserName = email.ToUpperInvariant(),
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        await using var db = CreateDbContext();
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        return user.Id;
     }
 
     public SpeakMateDbContext CreateDbContext() =>

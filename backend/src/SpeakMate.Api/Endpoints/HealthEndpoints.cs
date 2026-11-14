@@ -9,13 +9,13 @@ internal static class HealthEndpoints
     public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder app)
     {
         // Liveness: the process is up. No dependency checks, so it never flaps on DB outages.
-        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 
         // Readiness: dependencies (database, etc.) are reachable; used by load balancers.
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains(ReadyTag),
-        });
+        }).AllowAnonymous();
 
         return app;
     }

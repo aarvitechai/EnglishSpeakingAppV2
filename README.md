@@ -38,6 +38,32 @@ Dependencies point inward only: `Api → Infrastructure → Application → Doma
 - Node.js 22 or later
 - SQL Server (local instance `DESKTOP-2ERCDGB\MSSQLSERVER01`, Windows authentication)
 
+## One-time secret setup
+
+Secrets are never stored in the repository. Locally they live in .NET user-secrets (in your Windows profile); in production, use environment variables or a vault.
+
+```bash
+cd backend
+dotnet tool restore
+# JWT signing key (at least 32 bytes, random)
+dotnet user-secrets set "Jwt:SigningKey" "$(python -c "import secrets;print(secrets.token_urlsafe(48))")" --project src/SpeakMate.Api
+# Gemini API key (Phase 4)
+dotnet user-secrets set "Gemini:ApiKey" "<your-key>" --project src/SpeakMate.Api
+```
+
+In production, set the same values as `Jwt__SigningKey`, `Gemini__ApiKey` and `ConnectionStrings__SpeakMateDb`.
+
+## Authentication design
+
+| Concern | Approach |
+|---|---|
+| Passwords | ASP.NET Core Identity (PBKDF2 hashing). At least 10 characters, no forced character classes (NIST 800-63B). |
+| Brute force | Account lockout after 5 failures (15 min) and a per-IP rate limit on `/api/v1/auth/*` (10 per minute). |
+| Access token | JWT (HS256), valid 15 minutes, returned in the body and kept **in memory** by the web app. |
+| Refresh token | 256-bit random value in an `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` cookie. Only its SHA-256 hash is stored. Single-use rotation; replaying a spent token revokes the whole token family. |
+| Authorization | A fallback policy requires authentication on every endpoint unless it is explicitly `AllowAnonymous`. User IDs always come from the token, never from the URL. |
+| Account deletion | All learner tables cascade from `auth.Users`. |
+
 ## Run locally
 
 ```bash
