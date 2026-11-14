@@ -1,0 +1,163 @@
+/* Design tokens: every colour, radius and spacing value comes from here. */
+:root {
+  --color-bg: #f7f7fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eef0f6;
+  --color-text: #1b1d29;
+  --color-text-muted: #5b6075;
+  --color-border: #d9dce7;
+  --color-primary: #3b5bdb;
+  --color-primary-contrast: #ffffff;
+  --color-primary-soft: #e7ecff;
+  --color-success: #2b8a3e;
+  --color-success-soft: #e6f4ea;
+  --color-danger: #c92a2a;
+  --color-danger-soft: #fdecec;
+  --color-warning: #a65f00;
+  --color-warning-soft: #fff4e0;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 10%);
+  --focus-ring: 0 0 0 3px rgb(59 91 219 / 40%);
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  color-scheme: light dark;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #12131a;
+    --color-surface: #1b1d27;
+    --color-surface-muted: #252837;
+    --color-text: #eceef6;
+    --color-text-muted: #a3a8bd;
+    --color-border: #33374a;
+    --color-primary: #7b93ff;
+    --color-primary-contrast: #0d1020;
+    --color-primary-soft: #232a4d;
+    --color-success: #69db7c;
+    --color-success-soft: #1d3324;
+    --color-danger: #ff8787;
+    --color-danger-soft: #3a1f22;
+    --color-warning: #ffc078;
+    --color-warning-soft: #3a2d17;
+    --shadow-card: none;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0 0 var(--space-3);
+}
+
+p {
+  margin: 0 0 var(--space-3);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* App shell */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--color-primary);
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4);
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.status-badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.status-badge--ok {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.status-badge--error {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.status-badge--pending {
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+}

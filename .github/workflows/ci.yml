@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, staging, production]
+  pull_request:
+    branches: [dev, staging, production]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (build + unit tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore
+      - run: dotnet build --no-restore --configuration Release
+      # Integration tests need SQL Server; they run in the dedicated job below.
+      - run: dotnet test --no-build --configuration Release --project tests/SpeakMate.UnitTests
+
+  backend-integration:
+    name: Backend (integration tests, SQL Server)
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD || 'Ci_Only_Passw0rd!' }}
+        ports: ['1433:1433']
+    env:
+      ConnectionStrings__TestDatabase: Server=localhost,1433;Database=EnglishSpeakingAppV2DB_Test;User Id=sa;Password=${{ secrets.CI_SQL_SA_PASSWORD || 'Ci_Only_Passw0rd!' }};TrustServerCertificate=True
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet test --configuration Release --project tests/SpeakMate.IntegrationTests
+
+  web:
+    name: Web (lint + typecheck + tests + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

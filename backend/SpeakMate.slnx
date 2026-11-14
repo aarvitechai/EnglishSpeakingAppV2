@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SpeakMate.Api/SpeakMate.Api.csproj" />
+    <Project Path="src/SpeakMate.Application/SpeakMate.Application.csproj" />
+    <Project Path="src/SpeakMate.Domain/SpeakMate.Domain.csproj" />
+    <Project Path="src/SpeakMate.Infrastructure/SpeakMate.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SpeakMate.IntegrationTests/SpeakMate.IntegrationTests.csproj" />
+    <Project Path="tests/SpeakMate.UnitTests/SpeakMate.UnitTests.csproj" />
+  </Folder>
+</Solution>
