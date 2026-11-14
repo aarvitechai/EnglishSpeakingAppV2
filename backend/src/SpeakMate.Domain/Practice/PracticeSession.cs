@@ -63,9 +63,11 @@ public sealed class PracticeSession : Entity
     public IReadOnlyList<ConversationTurn> Turns => _turns;
     public SessionFeedback? Feedback { get; private set; }
 
+    /// <summary>Learner messages sent. Persisted, so statistics survive when a transcript is cleared.</summary>
+    public int LearnerMessageCount { get; private set; }
+
     public bool IsActive => Status == SessionStatus.Active;
-    public int LearnerTurnCount => _turns.Count(t => t.Speaker == Speaker.Learner);
-    public bool HasReachedTurnLimit => LearnerTurnCount >= MaxLearnerTurns;
+    public bool HasReachedTurnLimit => LearnerMessageCount >= MaxLearnerTurns;
     public TimeSpan Duration => (EndedAt ?? LastActivityAt) - StartedAt;
 
     public static PracticeSession Start(Guid userId, PracticeMode mode, EnglishLevel level, string topic,
@@ -108,14 +110,16 @@ public sealed class PracticeSession : Entity
             throw new DomainException("turn.confidence_invalid", "Speech confidence must be between 0 and 1.");
         }
 
-        return Append(Speaker.Learner, text, inputMethod, speechConfidence, now);
+        var turn = Append(Speaker.Learner, text, inputMethod, speechConfidence, now);
+        LearnerMessageCount++;
+        return turn;
     }
 
     /// <summary>Ends the session normally. Feedback can be attached afterwards.</summary>
     public void Complete(DateTimeOffset now)
     {
         EnsureActive();
-        if (LearnerTurnCount == 0)
+        if (LearnerMessageCount == 0)
         {
             throw new DomainException("session.empty", "Send at least one message before finishing the session.");
         }
@@ -132,6 +136,9 @@ public sealed class PracticeSession : Entity
         Status = SessionStatus.Abandoned;
         EndedAt = now;
     }
+
+    /// <summary>True when an active session has had no activity for longer than <paramref name="idleLimit"/>.</summary>
+    public bool IsIdle(DateTimeOffset now, TimeSpan idleLimit) => IsActive && now - LastActivityAt > idleLimit;
 
     public void AttachFeedback(SessionFeedback feedback)
     {

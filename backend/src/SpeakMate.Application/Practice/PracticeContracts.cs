@@ -1,4 +1,5 @@
 using FluentValidation;
+using SpeakMate.Domain.Feedback;
 using SpeakMate.Domain.Learners;
 using SpeakMate.Domain.Practice;
 
@@ -22,7 +23,36 @@ public sealed record SessionDto(
     DateTimeOffset? EndedAt,
     int LearnerTurnCount,
     int MaxLearnerTurns,
-    IReadOnlyList<TurnDto> Turns);
+    IReadOnlyList<TurnDto> Turns,
+    FeedbackDto? Feedback);
+
+public sealed record CorrectionDto(CorrectionCategory Category, string Original, string Improved, string Explanation);
+
+public sealed record FeedbackDto(
+    string Summary,
+    IReadOnlyList<CorrectionDto> Corrections,
+    IReadOnlyList<string> UsefulPhrases,
+    string RepeatTask,
+    bool? WasHelpful,
+    DateTimeOffset CreatedAt);
+
+public sealed record SessionSummaryDto(
+    Guid Id,
+    PracticeMode Mode,
+    string Topic,
+    SessionStatus Status,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    int DurationSeconds,
+    int LearnerTurnCount,
+    bool HasFeedback);
+
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
+{
+    public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+}
+
+public sealed record RateFeedbackRequest(bool WasHelpful);
 
 public sealed record TopicSuggestionsDto(PracticeMode Mode, IReadOnlyList<string> Topics);
 

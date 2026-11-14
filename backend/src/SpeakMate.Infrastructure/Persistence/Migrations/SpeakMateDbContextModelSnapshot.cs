@@ -254,6 +254,9 @@ namespace SpeakMate.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("LastActivityAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("LearnerMessageCount")
+                        .HasColumnType("int");
+
                     b.Property<string>("Level")
                         .IsRequired()
                         .HasMaxLength(40)

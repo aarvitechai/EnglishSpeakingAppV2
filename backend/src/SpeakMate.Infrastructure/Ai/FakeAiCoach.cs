@@ -33,4 +33,24 @@ public sealed class FakeAiCoach : IAiCoach
         var inputTokens = context.Turns.Sum(t => t.Text.Length) / 4 + 200;
         return Task.FromResult(new CoachReply(text, new AiUsage(ModelName, inputTokens, text.Length / 4, 1)));
     }
+
+    public Task<FeedbackDraft> GenerateFeedbackAsync(CoachContext context, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var firstLearnerLine = context.Turns.FirstOrDefault(t => t.Speaker == Speaker.Learner)?.Text ?? "Hello";
+        var corrections = new List<CorrectionDraft>
+        {
+            new("NaturalPhrasing", firstLearnerLine, firstLearnerLine.TrimEnd('.', '!', '?') + ", actually.",
+                "Demo correction from offline mode: a softener such as actually can sound more natural."),
+        };
+
+        return Task.FromResult(new FeedbackDraft(
+            $"Nice work practising \"{context.Topic}\" (offline demo feedback). You kept the conversation going well.",
+            corrections,
+            ["Could you say that again, please?", "In my opinion...", "That reminds me of..."],
+            "Answer the first question again and add one more detail.",
+            new AiUsage(ModelName, context.Turns.Sum(t => t.Text.Length) / 4 + 300, 120, 1)));
+    }
 }

@@ -26,6 +26,7 @@ public class SpeakMateApiFactory(TestDatabase database) : WebApplicationFactory<
         builder.UseSetting("ConnectionStrings:SpeakMateDb", database.ConnectionString);
         builder.UseSetting("Jwt:SigningKey", TestSigningKey);
         builder.UseSetting("Ai:Provider", "Fake");
+        builder.UseSetting("Retention:Enabled", "false");
         builder.UseSetting("RateLimiting:AiPermitsPerMinute", "10000");
         builder.UseSetting("RateLimiting:AuthPermitsPerMinute", AuthPermitsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
 

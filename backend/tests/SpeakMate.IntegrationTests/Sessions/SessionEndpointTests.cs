@@ -169,6 +169,9 @@ public sealed class SessionAiFailureTests(TestDatabase database) : ApiTestBase(d
     {
         public Task<CoachReply> GenerateReplyAsync(CoachContext context, CancellationToken cancellationToken = default) =>
             throw new AiProviderException("Simulated provider outage", new AiUsage("fake-coach", 10, 0, 5));
+
+        public Task<FeedbackDraft> GenerateFeedbackAsync(CoachContext context, CancellationToken cancellationToken = default) =>
+            throw new AiProviderException("Simulated provider outage");
     }
 
     protected override SpeakMateApiFactory CreateFactory() => new(Database)
