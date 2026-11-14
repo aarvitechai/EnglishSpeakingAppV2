@@ -12,40 +12,53 @@ The full product plan is in `AI_English_Practice_Web_Mobile_App_Plan.md`. It is 
 
 ## Current status
 
-Pre-development. No application code exists yet. Follow the build order below, and **don't start voice work until text chat works and has been tested with learners.**
+In active development, built phase by phase. Each phase is committed on `dev`, then merged `dev → staging → production` with `--no-ff`.
 
-## Planned stack
+## Stack (decided, replaces the plan's Node.js/PostgreSQL suggestion)
 
 | Layer | Choice |
 |---|---|
-| Web | React + TypeScript (Vite or Next.js) |
-| Mobile | React Native + Expo + TypeScript |
-| Backend | Node.js + TypeScript (Express or NestJS) |
-| AI | Google Gemini API via the official supported SDK, server-side only |
-| Database | PostgreSQL (managed, e.g. Supabase), with migrations and foreign keys |
-| Auth | Managed auth provider or secure backend auth (email sign-in) |
+| Backend | ASP.NET Core 10 minimal APIs, clean architecture |
+| Database | SQL Server `DESKTOP-2ERCDGB\MSSQLSERVER01`, database `EnglishSpeakingAppV2DB`, **Windows authentication only** (mixed mode is off) |
+| ORM | EF Core 10 code-first migrations |
+| AI | Gemini REST API via a typed `HttpClient`, server-side only, model ID in configuration |
+| Web | React 19 + TypeScript (strict) + Vite, TanStack Query, React Router, Zod |
+| Tests | xUnit v3 on Microsoft.Testing.Platform, NSubstitute; Vitest + Testing Library + MSW |
 
-These are suggestions. Confirm with the user before adding services that aren't listed here.
+Package versions: NuGet versions are pinned centrally in `backend/Directory.Packages.props`. Use 10.0.x Microsoft packages; 11.x needs .NET 11, which isn't installed.
 
-## Planned repository layout (monorepo)
+## Layout and dependency rule
 
 ```text
-apps/web/        React web app
-apps/mobile/     React Native + Expo app
-apps/api/        Node.js backend (the ONLY place provider SDKs are called)
-packages/shared/ Shared types, validation schemas, utilities
-packages/ui/     Shared design tokens/components where practical
-docs/            product-requirements, architecture, privacy-and-data-map, api-contracts, test-plan
-infra/deployment/
+backend/src/SpeakMate.Domain          entities and rules: no EF, no ASP.NET
+backend/src/SpeakMate.Application     use cases, ports (interfaces), DTOs, validators
+backend/src/SpeakMate.Infrastructure  EF Core DbContext, migrations, Gemini client, identity
+backend/src/SpeakMate.Api             endpoints, auth, middleware, DI composition root
+backend/tests/SpeakMate.UnitTests     domain, services, architecture rules
+backend/tests/SpeakMate.IntegrationTests  WebApplicationFactory + real SQL Server test DB
+web/                                  React app (calls only our API via /api, proxied in dev)
 ```
 
-Share types and schemas across apps. Don't force identical UI components on web and mobile when their interaction patterns differ.
+Dependencies point inward only. `LayerDependencyTests` fails the build if a layer references something it must not.
+
+## Commands
+
+```bash
+cd backend && dotnet build                 # warnings are errors (Directory.Build.props)
+cd backend && dotnet test                  # all backend tests (MTP runner, set in global.json)
+cd backend && dotnet test --project tests/SpeakMate.UnitTests
+cd backend && dotnet run --project src/SpeakMate.Api --launch-profile https   # https://localhost:7080, /scalar in dev
+cd web && npm run dev                      # http://localhost:5173
+cd web && npm test | npm run lint | npm run typecheck | npm run format:check | npm run build
+```
+
+Gemini key, set locally (never commit it): `dotnet user-secrets set "Gemini:ApiKey" "<key>" --project backend/src/SpeakMate.Api`
 
 ## Non-negotiable rules
 
 ### Secrets
 - The Gemini API key exists **only on the server** (server-side env secrets).
-- Never put it in React or React Native source, browser or mobile bundles, source maps, public-prefixed env vars (`VITE_*`, `NEXT_PUBLIC_*`, `EXPO_PUBLIC_*`), Git commits, logs or client error messages.
+- Never put it in React or React Native source, browser or mobile bundles, source maps, public-prefixed env vars (`VITE_*`, `EXPO_PUBLIC_*`), Git commits, logs or client error messages.
 - Clients call our backend. The backend calls Gemini. Keep `.env*` files out of Git.
 
 ### AI handling
