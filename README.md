@@ -64,6 +64,16 @@ In production, set the same values as `Jwt__SigningKey`, `Gemini__ApiKey` and `C
 | Authorization | A fallback policy requires authentication on every endpoint unless it is explicitly `AllowAnonymous`. User IDs always come from the token, never from the URL. |
 | Account deletion | All learner tables cascade from `auth.Users`. |
 
+## AI coach (Gemini)
+
+- **Server-side only:** the backend calls `POST v1beta/models/{model}:generateContent` with the key in the `x-goog-api-key` header. Clients never see the key.
+- **Model:** `gemini-3.5-flash-lite` by default (the cheapest stable model as of November 2026), set in `Gemini:Model`. Check [Google's model list](https://aistudio.google.com/docs/models) before changing it.
+- **Structured output:** replies must match a JSON schema (`{"reply": "..."}`). Empty, incomplete, blocked, overlong or malformed replies are rejected and the learner gets a friendly 503 to retry. Nothing is half-saved.
+- **Resilience:** retries with jittered back-off on 429/5xx, per-attempt and total timeouts, and a circuit breaker.
+- **Cost control:** every call is recorded in `app.UsageEvents` (tokens and estimated USD, never text). There's a rolling 24-hour token quota per learner, a cap of 3 active sessions, a cap of 30 messages per session, only the last 20 turns are sent as context, and AI endpoints are rate-limited to 20 requests per minute per user.
+- **Providers:** `Ai:Provider` is `Gemini` (production; startup fails without a key), `Auto` (development: Gemini if a key is set, otherwise the offline fake coach) or `Fake` (tests).
+- **Privacy:** Google's free tier may use submitted content to improve its products. Use a **paid** API key before real learners use the app.
+
 ## Run locally
 
 ```bash

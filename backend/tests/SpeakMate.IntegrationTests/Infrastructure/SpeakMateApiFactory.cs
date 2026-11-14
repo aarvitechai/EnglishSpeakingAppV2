@@ -14,6 +14,9 @@ public class SpeakMateApiFactory(TestDatabase database) : WebApplicationFactory<
     /// <summary>Raised far above normal so ordinary tests never trip the auth rate limiter.</summary>
     protected virtual int AuthPermitsPerMinute => 10_000;
 
+    /// <summary>Extra configuration values for a specific test (e.g. a tiny quota).</summary>
+    public IReadOnlyDictionary<string, string>? Settings { get; init; }
+
     /// <summary>Lets a test replace services (e.g. a fake AI client or a fake clock).</summary>
     public Action<IServiceCollection>? ConfigureTestServices { get; init; }
 
@@ -22,7 +25,14 @@ public class SpeakMateApiFactory(TestDatabase database) : WebApplicationFactory<
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:SpeakMateDb", database.ConnectionString);
         builder.UseSetting("Jwt:SigningKey", TestSigningKey);
+        builder.UseSetting("Ai:Provider", "Fake");
+        builder.UseSetting("RateLimiting:AiPermitsPerMinute", "10000");
         builder.UseSetting("RateLimiting:AuthPermitsPerMinute", AuthPermitsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        foreach (var (key, value) in Settings ?? new Dictionary<string, string>())
+        {
+            builder.UseSetting(key, value);
+        }
 
         if (ConfigureTestServices is not null)
         {
