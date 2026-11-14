@@ -14,6 +14,8 @@ public class SpeakMateApiFactory(TestDatabase database) : WebApplicationFactory<
     /// <summary>Raised far above normal so ordinary tests never trip the auth rate limiter.</summary>
     protected virtual int AuthPermitsPerMinute => 10_000;
 
+    protected virtual int GlobalPermitsPerMinute => 100_000;
+
     /// <summary>Extra configuration values for a specific test (e.g. a tiny quota).</summary>
     public IReadOnlyDictionary<string, string>? Settings { get; init; }
 
@@ -28,6 +30,7 @@ public class SpeakMateApiFactory(TestDatabase database) : WebApplicationFactory<
         builder.UseSetting("Ai:Provider", "Fake");
         builder.UseSetting("Retention:Enabled", "false");
         builder.UseSetting("RateLimiting:AiPermitsPerMinute", "10000");
+        builder.UseSetting("RateLimiting:GlobalPermitsPerMinute", GlobalPermitsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.UseSetting("RateLimiting:AuthPermitsPerMinute", AuthPermitsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         foreach (var (key, value) in Settings ?? new Dictionary<string, string>())
@@ -55,4 +58,10 @@ public class SpeakMateApiFactory(TestDatabase database) : WebApplicationFactory<
 public sealed class StrictRateLimitApiFactory(TestDatabase database) : SpeakMateApiFactory(database)
 {
     protected override int AuthPermitsPerMinute => 3;
+}
+
+/// <summary>Factory with a tiny global limit, for testing the baseline limiter.</summary>
+public sealed class StrictGlobalLimitApiFactory(TestDatabase database) : SpeakMateApiFactory(database)
+{
+    protected override int GlobalPermitsPerMinute => 5;
 }

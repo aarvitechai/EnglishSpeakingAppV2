@@ -4,6 +4,22 @@ An AI-powered English speaking-practice platform: learners talk with a patient A
 
 > **SpeakMate AI** is a working name (placeholder). The full product plan is in [`AI_English_Practice_Web_Mobile_App_Plan.md`](AI_English_Practice_Web_Mobile_App_Plan.md).
 
+## Try it locally
+
+| What | URL |
+|---|---|
+| **Web app** | **http://localhost:5173** |
+| API reference (Scalar, dev only) | https://localhost:7080/scalar |
+| Health | http://localhost:5173/health/ready |
+
+Start both servers (see [Run locally](#run-locally)), open the web app, create an account, finish onboarding and start a session. Without a Gemini key the API uses an offline demo coach, labelled "offline demo mode". Set a key to talk to the real AI.
+
+## Documentation
+
+- [Architecture](docs/architecture.md): layers, design decisions, request flow, scaling
+- [Security and privacy](docs/security.md): threat model with controls and the tests that prove them
+- [Operations runbook](docs/operations.md): configuration, deploy, monitoring, incidents
+
 ## Tech stack
 
 | Layer | Technology |
@@ -107,10 +123,21 @@ The API never migrates the database automatically on startup. Schema changes are
 ## Test
 
 ```bash
-cd backend && dotnet test          # unit + integration
-cd web && npm test                 # component and unit tests
+cd backend && dotnet test          # 197 tests: unit + integration (real SQL Server test database)
+cd web && npm test                 # 30 tests: unit + integration (real routes, mocked network)
 cd web && npm run test:coverage    # with coverage report
+cd web && npm run lint && npm run typecheck && npm run format:check
 ```
+
+| Suite | What it covers |
+|---|---|
+| Backend unit | Domain invariants, application services (with fakes), prompt rules, Gemini wire contract, feedback sanitising, progress maths, architecture rules |
+| Backend integration | Real HTTP pipeline + SQL Server: auth flows, lockout, token rotation and reuse detection, rate limits, data isolation between users, sessions, feedback, retention, export, account deletion cascade, production config guards |
+| Web | HTTP client refresh logic, auth and routing guards, onboarding, conversation (incl. simulated speech recognition), feedback retry, consent toggles, account deletion |
+
+## Production deployment
+
+Dockerfiles: `backend/Dockerfile` (non-root ASP.NET runtime) and `web/Dockerfile` (unprivileged nginx with a strict CSP; proxies `/api` to the API). Configuration, migrations and monitoring are covered in [docs/operations.md](docs/operations.md).
 
 ## Branching and release flow
 
