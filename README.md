@@ -51,6 +51,23 @@ npm install
 npm run dev
 ```
 
+## Database
+
+- **Development database:** `EnglishSpeakingAppV2DB` on `DESKTOP-2ERCDGB\MSSQLSERVER01`, Windows authentication.
+- **Test database:** `EnglishSpeakingAppV2DB_Test`. Integration tests drop and rebuild it from the migrations on every run, and refuse to run against any database whose name doesn't end in `_Test`.
+- All tables live in the `app` schema. Enums are stored as readable strings.
+
+```bash
+# from backend/ (the dotnet-ef version is pinned in dotnet-tools.json: run `dotnet tool restore` once)
+dotnet tool run dotnet-ef migrations add <Name> --project src/SpeakMate.Infrastructure --startup-project src/SpeakMate.Api --output-dir Persistence/Migrations
+dotnet tool run dotnet-ef database update --project src/SpeakMate.Infrastructure --startup-project src/SpeakMate.Api
+
+# production: generate a reviewed, idempotent script instead of migrating at app startup
+dotnet tool run dotnet-ef migrations script --idempotent --project src/SpeakMate.Infrastructure --startup-project src/SpeakMate.Api -o migrate.sql
+```
+
+The API never migrates the database automatically on startup. Schema changes are deployed as a reviewed step.
+
 ## Test
 
 ```bash

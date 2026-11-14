@@ -1,3 +1,5 @@
+using SpeakMate.Infrastructure;
+
 namespace SpeakMate.Api.Extensions;
 
 internal static class ServiceCollectionExtensions
@@ -9,6 +11,7 @@ internal static class ServiceCollectionExtensions
         services.AddOpenApi();
         services.AddProblemDetails();
         services.AddHealthChecks();
+        services.AddInfrastructure(configuration);
 
         var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
         services.AddCors(options => options.AddPolicy(WebClientCorsPolicy, policy => policy
