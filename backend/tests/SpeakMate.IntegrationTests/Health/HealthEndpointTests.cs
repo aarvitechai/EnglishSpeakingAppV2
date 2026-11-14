@@ -3,25 +3,25 @@ using SpeakMate.IntegrationTests.Infrastructure;
 
 namespace SpeakMate.IntegrationTests.Health;
 
-public sealed class HealthEndpointTests(SpeakMateApiFactory factory) : IClassFixture<SpeakMateApiFactory>
+public sealed class HealthEndpointTests(TestDatabase database) : IntegrationTestBase(database)
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly SpeakMateApiFactory _factory = new(database);
 
     [Theory]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
-    public async Task HealthEndpoint_WhenApiIsRunning_ReturnsHealthy(string url)
+    public async Task HealthEndpoint_WhenApiAndDatabaseAreUp_ReturnsHealthy(string url)
     {
-        var response = await _client.GetAsync(url, TestContext.Current.CancellationToken);
+        var response = await _factory.CreateClient().GetAsync(url, Ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync(Ct));
     }
 
     [Fact]
     public async Task AnyResponse_IncludesSecurityHeaders()
     {
-        var response = await _client.GetAsync("/health/live", TestContext.Current.CancellationToken);
+        var response = await _factory.CreateClient().GetAsync("/health/live", Ct);
 
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single());
@@ -31,8 +31,14 @@ public sealed class HealthEndpointTests(SpeakMateApiFactory factory) : IClassFix
     [Fact]
     public async Task UnknownRoute_ReturnsNotFound()
     {
-        var response = await _client.GetAsync("/does-not-exist", TestContext.Current.CancellationToken);
+        var response = await _factory.CreateClient().GetAsync("/does-not-exist", Ct);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await _factory.DisposeAsync();
+        await base.DisposeAsync();
     }
 }
