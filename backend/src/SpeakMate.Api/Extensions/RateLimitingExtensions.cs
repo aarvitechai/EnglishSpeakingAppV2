@@ -11,9 +11,13 @@ internal static class RateLimitingExtensions
     /// <summary>Strict per-IP limit for sign-in and registration (slows password guessing).</summary>
     public const string AuthPolicy = "auth";
 
+    /// <summary>Per-user limit on AI-backed endpoints (bounds cost if a client misbehaves).</summary>
+    public const string AiPolicy = "ai";
+
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         var authPermitLimit = configuration.GetValue("RateLimiting:AuthPermitsPerMinute", 10);
+        var aiPermitLimit = configuration.GetValue("RateLimiting:AiPermitsPerMinute", 20);
 
         services.AddRateLimiter(options =>
         {
@@ -23,6 +27,16 @@ internal static class RateLimitingExtensions
                 {
                     PermitLimit = authPermitLimit,
                     Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }));
+
+            options.AddPolicy(AiPolicy, http => RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: http.User.FindFirst("sub")?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = aiPermitLimit,
+                    Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 6,
                     QueueLimit = 0,
                 }));
 

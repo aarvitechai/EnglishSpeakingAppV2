@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SpeakMate.Application.Auth;
+using SpeakMate.Application.Usage;
+using SpeakMate.Infrastructure.Ai;
 using SpeakMate.Infrastructure.Identity;
 using SpeakMate.Application.Abstractions;
 using SpeakMate.Infrastructure.Persistence;
@@ -34,10 +36,12 @@ public static class DependencyInjection
         services.AddScoped<IPracticeSessionRepository, PracticeSessionRepository>();
         services.AddScoped<IUsageEventRepository, UsageEventRepository>();
         services.AddScoped<IConsentRepository, ConsentRepository>();
+        services.AddSingleton<IUsageRecorder, IsolatedUsageRecorder>();
 
         services.TryAddSingleton(TimeProvider.System);
 
         AddIdentity(services, configuration);
+        AddAi(services, configuration);
 
         services.AddHealthChecks()
             .AddDbContextCheck<SpeakMateDbContext>("database", tags: [ReadinessTag]);
@@ -76,4 +80,46 @@ public static class DependencyInjection
         services.AddSingleton<TokenFactory>();
         services.AddScoped<IAuthService, AuthService>();
     }
+
+    private static void AddAi(IServiceCollection services, IConfiguration configuration)
+    {
+        var usageLimits = configuration.GetSection(UsageLimits.SectionName).Get<UsageLimits>() ?? new UsageLimits();
+        services.AddSingleton(usageLimits);
+
+        services.AddOptions<GeminiOptions>()
+            .Bind(configuration.GetSection(GeminiOptions.SectionName))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.Model), "Gemini:Model is required.")
+            .ValidateOnStart();
+
+        var provider = configuration.GetValue(AiOptions.SectionName + ":Provider", AiProvider.Gemini);
+        var hasKey = !string.IsNullOrWhiteSpace(configuration[GeminiOptions.SectionName + ":ApiKey"]);
+        var resolved = provider switch
+        {
+            AiProvider.Auto => hasKey ? AiProvider.Gemini : AiProvider.Fake,
+            AiProvider.Gemini when !hasKey => throw new InvalidOperationException(
+                "Ai:Provider is Gemini but Gemini:ApiKey is not set. Set it with user-secrets or the Gemini__ApiKey environment variable."),
+            _ => provider,
+        };
+        services.AddSingleton(new AiRuntimeInfo(resolved));
+
+        if (resolved == AiProvider.Fake)
+        {
+            services.AddSingleton<IAiCoach, FakeAiCoach>();
+            return;
+        }
+
+        var gemini = configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>() ?? new GeminiOptions();
+        services.AddHttpClient<IAiCoach, GeminiCoach>(client => client.BaseAddress = gemini.BaseUrl)
+            .AddStandardResilienceHandler(o =>
+            {
+                // Retries 429/5xx/timeouts with jittered back-off; the breaker stops hammering a failing provider.
+                o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(gemini.AttemptTimeoutSeconds);
+                o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(gemini.AttemptTimeoutSeconds * 3);
+                o.Retry.MaxRetryAttempts = 2;
+                o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(gemini.AttemptTimeoutSeconds * 3);
+            });
+    }
 }
+
+/// <summary>Which AI provider is active in this process (logged at startup, shown in diagnostics).</summary>
+public sealed record AiRuntimeInfo(AiProvider Provider);
