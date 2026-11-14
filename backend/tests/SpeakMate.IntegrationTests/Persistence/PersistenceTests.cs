@@ -14,7 +14,13 @@ namespace SpeakMate.IntegrationTests.Persistence;
 public sealed class PersistenceTests(TestDatabase database) : IntegrationTestBase(database)
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 14, 9, 0, 0, TimeSpan.FromHours(5.5));
-    private readonly Guid _userId = Guid.NewGuid();
+    private Guid _userId;
+
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        _userId = await Database.CreateUserAsync();
+    }
 
     private async Task<PracticeSession> SaveCompletedSessionAsync(bool saveTranscript = true)
     {
@@ -136,13 +142,14 @@ public sealed class PersistenceTests(TestDatabase database) : IntegrationTestBas
     [Fact]
     public async Task UsageEvents_SumTokensOnlyWithinWindowAndForUser()
     {
+        var otherUserId = await Database.CreateUserAsync();
         await using (var db = Database.CreateDbContext())
         {
             db.UsageEvents.AddRange(
                 UsageEvent.Record(_userId, null, AiOperation.ConversationReply, "test-model", 100, 50, 0.001m, true, 300, Now),
                 UsageEvent.Record(_userId, null, AiOperation.SessionFeedback, "test-model", 200, 100, 0.002m, true, 400, Now.AddHours(1)),
                 UsageEvent.Record(_userId, null, AiOperation.ConversationReply, "test-model", 999, 999, 0.01m, true, 300, Now.AddDays(-2)),
-                UsageEvent.Record(Guid.NewGuid(), null, AiOperation.ConversationReply, "test-model", 500, 500, 0.01m, true, 300, Now));
+                UsageEvent.Record(otherUserId, null, AiOperation.ConversationReply, "test-model", 500, 500, 0.01m, true, 300, Now));
             await db.SaveChangesAsync(Ct);
         }
 
@@ -167,5 +174,31 @@ public sealed class PersistenceTests(TestDatabase database) : IntegrationTestBas
         var records = await new ConsentRepository(read).ListForUserAsync(_userId, Ct);
 
         Assert.Equal([ConsentType.TermsAndPrivacy, ConsentType.TranscriptStorage], records.Select(r => r.Type));
+    }
+
+    [Fact]
+    public async Task DeletingUser_CascadesToAllLearnerData()
+    {
+        await SaveCompletedSessionAsync();
+        await using (var db = Database.CreateDbContext())
+        {
+            db.LearnerProfiles.Add(LearnerProfile.Create(_userId, "Temp", Now));
+            db.ConsentRecords.Add(ConsentRecord.Grant(_userId, ConsentType.TermsAndPrivacy, "2026-11", Now));
+            db.UsageEvents.Add(UsageEvent.Record(_userId, null, AiOperation.ConversationReply, "m", 1, 1, 0, true, 1, Now));
+            await db.SaveChangesAsync(Ct);
+        }
+
+        await using (var db = Database.CreateDbContext())
+        {
+            await db.Users.Where(u => u.Id == _userId).ExecuteDeleteAsync(Ct);
+        }
+
+        await using var verify = Database.CreateDbContext();
+        Assert.False(await verify.PracticeSessions.AnyAsync(Ct));
+        Assert.False(await verify.ConversationTurns.AnyAsync(Ct));
+        Assert.False(await verify.SessionFeedback.AnyAsync(Ct));
+        Assert.False(await verify.LearnerProfiles.AnyAsync(Ct));
+        Assert.False(await verify.ConsentRecords.AnyAsync(Ct));
+        Assert.False(await verify.UsageEvents.AnyAsync(Ct));
     }
 }

@@ -392,3 +392,10 @@ dotnet_naming_style.s_camelcase.capitalization = camel_case
 [backend/src/SpeakMate.Infrastructure/Persistence/Migrations/**.cs]
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
+
+# ---- SpeakMate analyzer policy ----
+[*.cs]
+# CA1716: VB keyword clashes are irrelevant for a C#-only codebase (we use a type named Error).
+dotnet_diagnostic.CA1716.severity = none
+# CA1000: static factory members on generic types (Result<T>.Success) are an intentional pattern.
+dotnet_diagnostic.CA1000.severity = none

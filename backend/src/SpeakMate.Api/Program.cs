@@ -1,6 +1,5 @@
 using System.Globalization;
 using Serilog;
-using SpeakMate.Api.Endpoints;
 using SpeakMate.Api.Extensions;
 
 // Bootstrap logger captures failures that happen before the host is fully built.
@@ -23,7 +22,7 @@ try
     var app = builder.Build();
 
     app.UseApiPipeline();
-    app.MapHealthEndpoints();
+    app.MapApiEndpoints();
 
     await app.RunAsync();
 }
