@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using SpeakMate.Application.Account;
 using SpeakMate.Application.Auth;
 using SpeakMate.Application.Usage;
 using SpeakMate.Infrastructure.Ai;
@@ -9,6 +10,7 @@ using SpeakMate.Infrastructure.Identity;
 using SpeakMate.Application.Abstractions;
 using SpeakMate.Infrastructure.Persistence;
 using SpeakMate.Infrastructure.Persistence.Repositories;
+using SpeakMate.Infrastructure.Retention;
 
 namespace SpeakMate.Infrastructure;
 
@@ -42,6 +44,10 @@ public static class DependencyInjection
 
         AddIdentity(services, configuration);
         AddAi(services, configuration);
+
+        services.AddOptions<RetentionOptions>().Bind(configuration.GetSection(RetentionOptions.SectionName));
+        services.AddScoped<RetentionService>();
+        services.AddHostedService<RetentionWorker>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<SpeakMateDbContext>("database", tags: [ReadinessTag]);
@@ -79,6 +85,7 @@ public static class DependencyInjection
 
         services.AddSingleton<TokenFactory>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAccountService, AccountService>();
     }
 
     private static void AddAi(IServiceCollection services, IConfiguration configuration)

@@ -74,7 +74,7 @@ public sealed partial class PracticeService(
         session.AddCoachTurn(reply.Text, clock.GetUtcNow());
         sessions.Add(session);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return ToDto(session);
+        return SessionMapping.ToDto(session);
     }
 
     public async Task<Result<SessionDto>> SendMessageAsync(Guid userId, Guid sessionId, SendMessageRequest request,
@@ -121,26 +121,20 @@ public sealed partial class PracticeService(
 
         session.AddCoachTurn(reply.Text, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return ToDto(session);
+        return SessionMapping.ToDto(session);
     }
 
     public async Task<Result<SessionDto>> GetAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default)
     {
         var session = await sessions.GetForUserAsync(sessionId, userId, cancellationToken).ConfigureAwait(false);
-        return session is null ? SessionNotFound : ToDto(session);
+        return session is null ? SessionNotFound : SessionMapping.ToDto(session);
     }
 
     /// <summary>Calls the coach and records usage either way. Returns null if the provider failed.</summary>
     private async Task<CoachReply?> AskCoachAsync(Guid userId, PracticeSession session, LearnerProfile profile,
         CancellationToken cancellationToken)
     {
-        var context = new CoachContext(
-            session.Mode,
-            session.Level,
-            session.Topic,
-            profile.Goals,
-            profile.SupportLanguage,
-            session.Turns.Select(t => new CoachTurn(t.Speaker, t.Text, t.InputMethod, t.SpeechConfidence)).ToList());
+        var context = SessionMapping.ToCoachContext(session, profile);
 
         try
         {
@@ -176,13 +170,6 @@ public sealed partial class PracticeService(
         var records = await consents.ListForUserAsync(userId, cancellationToken).ConfigureAwait(false);
         return records.Where(r => r.Type == ConsentType.TranscriptStorage).MaxBy(r => r.GrantedAt)?.IsActive ?? false;
     }
-
-    internal static SessionDto ToDto(PracticeSession s) =>
-        new(s.Id, s.Mode, s.Level, s.Topic, s.Status, s.SaveTranscript, s.TranscriptCleared, s.StartedAt, s.EndedAt,
-            s.LearnerTurnCount, PracticeSession.MaxLearnerTurns,
-            s.Turns.OrderBy(t => t.Sequence)
-                .Select(t => new TurnDto(t.Sequence, t.Speaker, t.Text, t.InputMethod, t.CreatedAt))
-                .ToList());
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "AI coach failed for session {SessionId}")]
     private partial void LogCoachFailure(Exception exception, Guid sessionId);

@@ -152,3 +152,28 @@ public sealed class GeminiCoachTests
         Assert.DoesNotContain("secret internal detail", ex.Message, StringComparison.Ordinal);
     }
 }
+
+public sealed class GeminiFeedbackParsingTests
+{
+    [Fact]
+    public void ExtractPayload_ParsesFeedbackJson()
+    {
+        const string json = """
+            {"summary":"Nice.","corrections":[{"category":"Grammar","original":"I go","improved":"I went","explanation":"Past."}],
+             "usefulPhrases":["Shall we?"],"repeatTask":"Retell."}
+            """;
+        var response = new GeminiResponse(
+            [new GeminiCandidate(new GeminiContent("model", [new GeminiPart(json)]), "STOP")], null, null, null);
+
+        var payload = GeminiCoach.ExtractPayload<FeedbackPayload>(response, new AiUsageStub().Usage);
+
+        Assert.Equal("Nice.", payload.Summary);
+        Assert.Equal("I went", Assert.Single(payload.Corrections!).Improved);
+        Assert.Equal(["Shall we?"], payload.UsefulPhrases);
+    }
+
+    private sealed class AiUsageStub
+    {
+        public SpeakMate.Application.Abstractions.AiUsage Usage { get; } = new("m", 1, 1, 1);
+    }
+}

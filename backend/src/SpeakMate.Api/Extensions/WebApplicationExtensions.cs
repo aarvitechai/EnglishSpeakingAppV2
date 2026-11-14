@@ -42,6 +42,7 @@ internal static class WebApplicationExtensions
         app.MapAuthEndpoints();
         app.MapMeEndpoints();
         app.MapSessionEndpoints();
+        app.MapFeedbackAndProgressEndpoints();
         return app;
     }
 

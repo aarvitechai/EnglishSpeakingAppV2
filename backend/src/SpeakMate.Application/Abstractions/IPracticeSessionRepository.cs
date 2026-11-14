@@ -1,3 +1,5 @@
+using SpeakMate.Application.Practice;
+using SpeakMate.Domain.Feedback;
 using SpeakMate.Domain.Practice;
 
 namespace SpeakMate.Application.Abstractions;
@@ -14,4 +16,21 @@ public interface IPracticeSessionRepository
     Task<int> CountActiveForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
     void Add(PracticeSession session);
+
+    /// <summary>A user's sessions, newest first, as lightweight summaries (no transcript).</summary>
+    Task<PagedResult<SessionSummaryDto>> ListForUserAsync(Guid userId, int page, int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Practice activity (sessions with at least one learner message) since a point in time.</summary>
+    Task<IReadOnlyList<PracticeActivity>> ListActivityAsync(Guid userId, DateTimeOffset since,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountCompletedAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>Correction categories from feedback on sessions started since a point in time.</summary>
+    Task<IReadOnlyList<CorrectionCategory>> ListCorrectionCategoriesAsync(Guid userId, DateTimeOffset since,
+        CancellationToken cancellationToken = default);
 }
+
+/// <summary>One practice session reduced to what progress statistics need.</summary>
+public sealed record PracticeActivity(DateTimeOffset StartedAt, DateTimeOffset LastActivityAt, DateTimeOffset? EndedAt);

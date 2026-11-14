@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SpeakMate.Application.Abstractions;
+using SpeakMate.Application.Feedback;
 using SpeakMate.Application.Practice;
 using SpeakMate.Domain.Practice;
 
@@ -34,29 +35,87 @@ internal sealed partial class GeminiCoach(HttpClient http, IOptions<GeminiOption
         }
         """).RootElement.Clone();
 
+    private static readonly JsonElement FeedbackSchema = JsonDocument.Parse("""
+        {
+          "type": "object",
+          "properties": {
+            "summary": { "type": "string" },
+            "corrections": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "category": { "type": "string", "enum": ["Grammar", "Vocabulary", "NaturalPhrasing", "Fluency", "Pronunciation"] },
+                  "original": { "type": "string" },
+                  "improved": { "type": "string" },
+                  "explanation": { "type": "string" }
+                },
+                "required": ["category", "original", "improved", "explanation"]
+              }
+            },
+            "usefulPhrases": { "type": "array", "maxItems": 5, "items": { "type": "string" } },
+            "repeatTask": { "type": "string" }
+          },
+          "required": ["summary", "corrections", "usefulPhrases", "repeatTask"]
+        }
+        """).RootElement.Clone();
+
     private readonly GeminiOptions _options = options.Value;
 
     public async Task<CoachReply> GenerateReplyAsync(CoachContext context, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var request = new GeminiRequest(
-            new GeminiContent(null, [new GeminiPart(CoachPromptBuilder.BuildSystemInstruction(context))]),
-            CoachPromptBuilder.BuildConversation(context)
-                .Select(m => new GeminiContent(m.Speaker == Speaker.Coach ? "model" : "user", [new GeminiPart(m.Text)]))
+        var contents = CoachPromptBuilder.BuildConversation(context)
+            .Select(m => new GeminiContent(m.Speaker == Speaker.Coach ? "model" : "user", [new GeminiPart(m.Text)]))
+            .ToList();
+
+        var (response, usage) = await CallAsync(CoachPromptBuilder.BuildSystemInstruction(context), contents,
+            ReplySchema, cancellationToken).ConfigureAwait(false);
+        return new CoachReply(ExtractReply(response, usage), usage);
+    }
+
+    public async Task<FeedbackDraft> GenerateFeedbackAsync(CoachContext context, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        GeminiContent[] contents =
+        [
+            new("user", [new GeminiPart("Review this practice conversation transcript:\n\n" +
+                                        FeedbackPromptBuilder.BuildTranscript(context))]),
+        ];
+
+        var (response, usage) = await CallAsync(FeedbackPromptBuilder.BuildInstruction(context), contents,
+            FeedbackSchema, cancellationToken).ConfigureAwait(false);
+        var payload = ExtractPayload<FeedbackPayload>(response, usage);
+
+        // Further sanitising (limits, categories, lengths) happens in the Application layer.
+        return new FeedbackDraft(
+            payload.Summary ?? string.Empty,
+            (payload.Corrections ?? [])
+                .Select(c => new CorrectionDraft(c.Category ?? "", c.Original ?? "", c.Improved ?? "", c.Explanation ?? ""))
                 .ToList(),
+            payload.UsefulPhrases ?? [],
+            payload.RepeatTask ?? string.Empty,
+            usage);
+    }
+
+    private async Task<(GeminiResponse Response, AiUsage Usage)> CallAsync(string systemInstruction,
+        IReadOnlyList<GeminiContent> contents, JsonElement schema, CancellationToken cancellationToken)
+    {
+        var request = new GeminiRequest(
+            new GeminiContent(null, [new GeminiPart(systemInstruction)]),
+            contents,
             new GeminiGenerationConfig(
                 "application/json",
-                ReplySchema,
+                schema,
                 _options.MaxOutputTokens,
                 string.IsNullOrWhiteSpace(_options.ThinkingLevel) ? null : new GeminiThinkingConfig(_options.ThinkingLevel)));
 
         var stopwatch = Stopwatch.StartNew();
         var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var usage = ToUsage(response, (int)stopwatch.ElapsedMilliseconds);
-
-        var text = ExtractReply(response, usage);
-        return new CoachReply(text, usage);
+        return (response, ToUsage(response, (int)stopwatch.ElapsedMilliseconds));
     }
 
     private async Task<GeminiResponse> SendAsync(GeminiRequest request, CancellationToken cancellationToken)
@@ -109,38 +168,43 @@ internal sealed partial class GeminiCoach(HttpClient http, IOptions<GeminiOption
 
     internal static string ExtractReply(GeminiResponse response, AiUsage usage)
     {
-        if (response.PromptFeedback?.BlockReason is { } blockReason)
-        {
-            throw new AiProviderException($"The AI provider blocked the request ({blockReason}).", usage);
-        }
-
-        var candidate = response.Candidates is { Count: > 0 } candidates ? candidates[0] : null;
-        var rawJson = string.Concat(candidate?.Content?.Parts?
-            .Where(p => !p.Thought && p.Text is not null)
-            .Select(p => p.Text) ?? []);
-
-        if (candidate?.FinishReason is { } finish && finish is not "STOP")
-        {
-            throw new AiProviderException($"The AI reply was incomplete ({finish}).", usage);
-        }
-
-        CoachReplyPayload? payload;
-        try
-        {
-            payload = JsonSerializer.Deserialize<CoachReplyPayload>(rawJson, WireJson);
-        }
-        catch (JsonException ex)
-        {
-            throw new AiProviderException("The AI reply did not match the expected format.", usage, ex);
-        }
-
-        var reply = payload?.Reply?.Trim();
+        var reply = ExtractPayload<CoachReplyPayload>(response, usage).Reply?.Trim();
         if (string.IsNullOrWhiteSpace(reply) || reply.Length > MaxReplyCharacters)
         {
             throw new AiProviderException("The AI reply was empty or too long.", usage);
         }
 
         return reply;
+    }
+
+    /// <summary>Checks blocking/finish state and deserialises the JSON the model produced.</summary>
+    internal static TPayload ExtractPayload<TPayload>(GeminiResponse response, AiUsage usage)
+        where TPayload : class
+    {
+        if (response.PromptFeedback?.BlockReason is { } blockReason)
+        {
+            throw new AiProviderException($"The AI provider blocked the request ({blockReason}).", usage);
+        }
+
+        var candidate = response.Candidates is { Count: > 0 } candidates ? candidates[0] : null;
+        if (candidate?.FinishReason is { } finish && finish is not "STOP")
+        {
+            throw new AiProviderException($"The AI reply was incomplete ({finish}).", usage);
+        }
+
+        var rawJson = string.Concat(candidate?.Content?.Parts?
+            .Where(p => !p.Thought && p.Text is not null)
+            .Select(p => p.Text) ?? []);
+
+        try
+        {
+            return JsonSerializer.Deserialize<TPayload>(rawJson, WireJson)
+                   ?? throw new AiProviderException("The AI reply was empty.", usage);
+        }
+        catch (JsonException ex)
+        {
+            throw new AiProviderException("The AI reply did not match the expected format.", usage, ex);
+        }
     }
 
     private AiUsage ToUsage(GeminiResponse response, int durationMs)
