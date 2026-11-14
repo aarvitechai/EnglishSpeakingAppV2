@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\SpeakMate.Application\SpeakMate.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SpeakMate.UnitTests" />
+    <InternalsVisibleTo Include="SpeakMate.IntegrationTests" />
+  </ItemGroup>
+</Project>
