@@ -35,7 +35,6 @@ internal sealed class PracticeSessionConfiguration : IEntityTypeConfiguration<Pr
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Ignore(s => s.IsActive);
-        builder.Ignore(s => s.LearnerTurnCount);
         builder.Ignore(s => s.HasReachedTurnLimit);
         builder.Ignore(s => s.Duration);
     }

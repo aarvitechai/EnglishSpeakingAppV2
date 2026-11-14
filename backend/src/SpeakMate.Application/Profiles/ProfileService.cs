@@ -46,6 +46,6 @@ public sealed class ProfileService(ILearnerProfileRepository profiles, IUnitOfWo
         return ToDto(profile);
     }
 
-    internal static ProfileDto ToDto(LearnerProfile p) =>
+    public static ProfileDto ToDto(LearnerProfile p) =>
         new(p.DisplayName, p.Level, p.Goals, p.SupportLanguage, p.DailyTargetMinutes, p.HasCompletedOnboarding);
 }

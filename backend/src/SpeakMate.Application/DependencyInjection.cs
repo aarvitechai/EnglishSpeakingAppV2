@@ -1,6 +1,8 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using SpeakMate.Application.Consents;
+using SpeakMate.Application.Feedback;
+using SpeakMate.Application.Progress;
 using SpeakMate.Application.Practice;
 using SpeakMate.Application.Usage;
 using SpeakMate.Application.Profiles;
@@ -17,6 +19,8 @@ public static class DependencyInjection
         services.AddScoped<ConsentService>();
         services.AddScoped<PracticeService>();
         services.AddScoped<UsageGuard>();
+        services.AddScoped<SessionFeedbackService>();
+        services.AddScoped<ProgressService>();
 
         return services;
     }

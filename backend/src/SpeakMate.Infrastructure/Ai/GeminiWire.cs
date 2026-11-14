@@ -50,3 +50,15 @@ internal sealed record GeminiUsageMetadata(
 
 /// <summary>Structured output the coach must return.</summary>
 internal sealed record CoachReplyPayload([property: JsonPropertyName("reply")] string? Reply);
+
+internal sealed record FeedbackPayload(
+    [property: JsonPropertyName("summary")] string? Summary,
+    [property: JsonPropertyName("corrections")] IReadOnlyList<CorrectionPayload>? Corrections,
+    [property: JsonPropertyName("usefulPhrases")] IReadOnlyList<string>? UsefulPhrases,
+    [property: JsonPropertyName("repeatTask")] string? RepeatTask);
+
+internal sealed record CorrectionPayload(
+    [property: JsonPropertyName("category")] string? Category,
+    [property: JsonPropertyName("original")] string? Original,
+    [property: JsonPropertyName("improved")] string? Improved,
+    [property: JsonPropertyName("explanation")] string? Explanation);

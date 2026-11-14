@@ -270,3 +270,36 @@ public sealed class PracticeSessionTests
         Assert.Equal(2, session.Turns.Count);
     }
 }
+
+public sealed class PracticeSessionCountingTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 11, 14, 9, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void LearnerMessageCount_SurvivesTranscriptClearing()
+    {
+        var session = PracticeSession.Start(Guid.NewGuid(), PracticeMode.DailyConversation, EnglishLevel.Beginner, "T", false, Now);
+        session.AddCoachTurn("Q1", Now);
+        session.AddLearnerTurn("A1", InputMethod.Text, null, Now);
+        session.AddCoachTurn("Q2", Now);
+        session.AddLearnerTurn("A2", InputMethod.Text, null, Now);
+        session.Complete(Now);
+
+        session.ClearTranscriptIfNotConsented();
+
+        Assert.Empty(session.Turns);
+        Assert.Equal(2, session.LearnerMessageCount);
+    }
+
+    [Fact]
+    public void IsIdle_OnlyForActiveSessionsPastTheLimit()
+    {
+        var session = PracticeSession.Start(Guid.NewGuid(), PracticeMode.DailyConversation, EnglishLevel.Beginner, "T", false, Now);
+
+        Assert.False(session.IsIdle(Now.AddMinutes(30), TimeSpan.FromHours(2)));
+        Assert.True(session.IsIdle(Now.AddHours(3), TimeSpan.FromHours(2)));
+
+        session.Abandon(Now);
+        Assert.False(session.IsIdle(Now.AddHours(3), TimeSpan.FromHours(2)));
+    }
+}
