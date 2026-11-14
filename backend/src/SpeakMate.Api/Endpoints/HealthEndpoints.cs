@@ -4,7 +4,7 @@ namespace SpeakMate.Api.Endpoints;
 
 internal static class HealthEndpoints
 {
-    public const string ReadyTag = "ready";
+    public const string ReadyTag = SpeakMate.Infrastructure.DependencyInjection.ReadinessTag;
 
     public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder app)
     {
