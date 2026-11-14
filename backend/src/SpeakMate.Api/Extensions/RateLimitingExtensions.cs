@@ -18,9 +18,23 @@ internal static class RateLimitingExtensions
     {
         var authPermitLimit = configuration.GetValue("RateLimiting:AuthPermitsPerMinute", 10);
         var aiPermitLimit = configuration.GetValue("RateLimiting:AiPermitsPerMinute", 20);
+        var globalPermitLimit = configuration.GetValue("RateLimiting:GlobalPermitsPerMinute", 300);
 
         services.AddRateLimiter(options =>
         {
+            // Baseline for every request (per client IP). Health probes are exempt so orchestrators never get 429.
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
+                http.Request.Path.StartsWithSegments("/health")
+                    ? RateLimitPartition.GetNoLimiter("health")
+                    : RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = globalPermitLimit,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                        }));
+
             options.AddPolicy(AuthPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions
